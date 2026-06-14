@@ -1,7 +1,15 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Key(String);
+
+impl Display for Key {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl Key {
     pub fn from(key: &str) -> Self {
@@ -12,6 +20,12 @@ impl Key {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Value(String);
 
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl Value {
     pub fn from(value: &str) -> Self {
         Value(value.to_string())
@@ -21,6 +35,7 @@ impl Value {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Message {
     Set { key: Key, value: Value },
+    Del { key: Key },
 }
 
 impl Message {
@@ -30,11 +45,5 @@ impl Message {
 
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
         serde_json::from_slice::<Message>(&bytes).unwrap()
-    }
-}
-
-impl Message {
-    pub fn set(key: Key, value: Value) -> Self {
-        return Message::Set { key, value };
     }
 }

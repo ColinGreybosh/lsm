@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 
 use crate::wal::message::{Key, Message, Value};
 use crate::wal::reader::{FileLogReader, LogReader};
@@ -10,6 +11,7 @@ pub mod wal;
 pub trait Keyable {
     fn put(&mut self, key: Key, value: Value) -> Result<(), ()>;
     fn get(&self, key: Key) -> Option<Value>;
+    fn del(&mut self, key: Key) -> Result<(), ()>;
 }
 
 #[derive(Debug)]
@@ -23,7 +25,11 @@ where
 
 impl<Log: LogWriter> Keyable for LogStructuredMergeTree<Log> {
     fn put(&mut self, key: Key, value: Value) -> Result<(), ()> {
-        self.wal.append(&key, &value)?;
+        let message = Message::Set {
+            key: key.clone(),
+            value: value.clone(),
+        };
+        self.wal.append(&message)?;
         self.map.insert(key, value);
         Ok(())
     }
@@ -34,74 +40,112 @@ impl<Log: LogWriter> Keyable for LogStructuredMergeTree<Log> {
             None => None,
         }
     }
+
+    fn del(&mut self, key: Key) -> Result<(), ()> {
+        let message = Message::Del { key: key.clone() };
+        self.wal.append(&message)?;
+        self.map.remove(&key);
+        Ok(())
+    }
 }
 
 impl LogStructuredMergeTree<FileLogWriter> {
-    pub fn new() -> Self {
+    pub fn new<P: AsRef<Path>>(base_path: P) -> Self {
+        std::fs::create_dir_all(&base_path).expect("Failed to create WAL directory");
         let mut map = HashMap::new();
-        let reader = FileLogReader::new().unwrap();
+        let reader = FileLogReader::new(&base_path).unwrap();
         let messages = reader.read();
         match messages {
             Ok(messages) => {
                 for message in messages {
                     match message {
                         Message::Set { key, value } => map.insert(key, value),
+                        Message::Del { key } => map.remove(&key),
                     };
                 }
             }
             Err(_) => panic!("Failed to initialize in-memory store"),
         }
-        let wal = FileLogWriter::new().unwrap();
-        LogStructuredMergeTree { wal, map }
+        let wal = FileLogWriter::new(&base_path).unwrap();
+        Self { wal, map }
     }
 }
 
 impl<Log: LogWriter> LogStructuredMergeTree<Log> {
     pub fn with_wal(wal: Log) -> Self {
         let map = HashMap::new();
-        LogStructuredMergeTree { wal, map }
+        Self { wal, map }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[test]
     fn should_write_and_read_data() {
-        let mut lsm = LogStructuredMergeTree::new();
-        let write_result = lsm.put(Key::from("my_key"), Value::from("some_value"));
-        std::assert_matches!(write_result, Ok(()));
-        let read_result = lsm.get(Key::from("my_key"));
-        std::assert!(match read_result {
-            Some(value) => value == Value::from("some_value"),
-            None => false,
-        });
+        let tmp_dir = TempDir::new().expect("Failed to create temp dir");
+        let mut lsm = LogStructuredMergeTree::new(tmp_dir.path());
+
+        std::assert_eq!(
+            lsm.put(Key::from("my_key"), Value::from("some_value")),
+            Ok(())
+        );
+
+        std::assert_eq!(
+            lsm.get(Key::from("my_key")),
+            Some(Value::from("some_value"))
+        );
     }
 
     #[test]
     fn should_return_none_for_nonexistent_key() {
-        let lsm = LogStructuredMergeTree::new();
-        let read_result = lsm.get(Key::from("some_key"));
-        std::assert_matches!(read_result, None);
+        let tmp_dir = TempDir::new().expect("Failed to create temp dir");
+        let lsm = LogStructuredMergeTree::new(tmp_dir.path());
+
+        std::assert_eq!(lsm.get(Key::from("some_key")), None);
     }
 
     #[test]
     fn should_overwrite_value() {
-        let mut lsm = LogStructuredMergeTree::new();
-        lsm.put(Key::from("my_key"), Value::from("some_value"))
-            .unwrap();
-        let first_read_result = lsm.get(Key::from("my_key"));
-        std::assert!(match first_read_result {
-            Some(value) => value == Value::from("some_value"),
-            None => false,
-        });
-        lsm.put(Key::from("my_key"), Value::from("some_new_value"))
-            .unwrap();
-        let second_read_result = lsm.get(Key::from("my_key"));
-        std::assert!(match second_read_result {
-            Some(value) => value == Value::from("some_new_value"),
-            None => false,
-        });
+        let tmp_dir = TempDir::new().expect("Failed to create temp dir");
+        let mut lsm = LogStructuredMergeTree::new(tmp_dir.path());
+
+        std::assert_eq!(
+            lsm.put(Key::from("my_key"), Value::from("some_value")),
+            Ok(())
+        );
+        std::assert_eq!(
+            lsm.get(Key::from("my_key")),
+            Some(Value::from("some_value"))
+        );
+
+        std::assert_eq!(
+            lsm.put(Key::from("my_key"), Value::from("some_new_value")),
+            Ok(())
+        );
+        std::assert_eq!(
+            lsm.get(Key::from("my_key")),
+            Some(Value::from("some_new_value"))
+        );
+    }
+
+    #[test]
+    fn should_delete_key() {
+        let tmp_dir = TempDir::new().expect("Failed to create temp dir");
+        let mut lsm = LogStructuredMergeTree::new(tmp_dir.path());
+
+        std::assert_eq!(
+            lsm.put(Key::from("my_key"), Value::from("some_value")),
+            Ok(())
+        );
+        std::assert_eq!(
+            lsm.get(Key::from("my_key")),
+            Some(Value::from("some_value"))
+        );
+
+        std::assert_eq!(lsm.del(Key::from("my_key")), Ok(()));
+        std::assert_eq!(lsm.get(Key::from("my_key")), None);
     }
 }

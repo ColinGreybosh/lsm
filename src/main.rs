@@ -1,3 +1,5 @@
+use std::process::ExitCode;
+
 use clap::Parser;
 use lsm::{
     Keyable, LogStructuredMergeTree,
@@ -5,21 +7,26 @@ use lsm::{
     wal::message::{Key, Value},
 };
 
-fn main() {
+fn main() -> ExitCode {
     let cli = Cli::parse();
 
-    let mut lsm = LogStructuredMergeTree::new();
-
-    if cli.debug.is_some_and(|x| x) {
-        println!("Initial contents: {:?}", lsm);
-    }
+    let mut lsm = LogStructuredMergeTree::new(&cli.path);
 
     match cli.command {
-        Commands::Set { key, value } => {
-            match lsm.put(Key::from(&key), Value::from(&value)) {
-                Ok(_) => println!("Success!"),
-                Err(_) => panic!(),
-            };
-        }
+        Commands::Set { key, value } => match lsm.put(Key::from(&key), Value::from(&value)) {
+            Ok(_) => ExitCode::SUCCESS,
+            Err(_) => ExitCode::FAILURE,
+        },
+        Commands::Get { key } => match lsm.get(Key::from(&key)) {
+            Some(value) => {
+                println!("{}", value);
+                ExitCode::SUCCESS
+            }
+            None => ExitCode::FAILURE,
+        },
+        Commands::Del { key } => match lsm.del(Key::from(&key)) {
+            Ok(_) => ExitCode::SUCCESS,
+            Err(_) => ExitCode::FAILURE,
+        },
     }
 }

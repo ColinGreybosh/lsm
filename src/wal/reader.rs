@@ -16,18 +16,14 @@ pub struct FileLogReader {
 }
 
 impl FileLogReader {
-    pub fn new() -> Result<Self, Error> {
-        let file_path = Path::new("wal");
-        if !file_path.exists() {
-            match OpenOptions::new().create(true).write(true).open(file_path) {
-                Ok(_) => (),
-                Err(err) => return Err(err),
-            }
-        }
-        match OpenOptions::new().read(true).open(file_path) {
-            Ok(file) => Ok(FileLogReader { file }),
-            Err(err) => Err(err),
-        }
+    pub fn new<P: AsRef<Path>>(base_path: P) -> Result<Self, Error> {
+        let file_path = base_path.as_ref().join("log.wal");
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(file_path)?;
+        Ok(Self { file })
     }
 }
 
