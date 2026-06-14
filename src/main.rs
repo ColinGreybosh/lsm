@@ -17,7 +17,7 @@ fn main() -> ExitCode {
             Ok(_) => ExitCode::SUCCESS,
             Err(_) => ExitCode::FAILURE,
         },
-        Commands::Get { key } => match lsm.get(Key::from(&key)) {
+        Commands::Get { key } => match lsm.get(&Key::from(&key)) {
             Some(value) => {
                 println!("{}", value);
                 ExitCode::SUCCESS

@@ -1,31 +1,27 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::wal::log::{FileWal, WriteAheadLog};
 use crate::wal::message::{Key, Message, Value};
-use crate::wal::reader::{FileLogReader, LogReader};
-use crate::wal::writer::{FileLogWriter, LogWriter};
 
 pub mod cli;
 pub mod wal;
 
 pub trait Keyable {
-    fn put(&mut self, key: Key, value: Value) -> Result<(), ()>;
-    fn get(&self, key: Key) -> Option<Value>;
-    fn del(&mut self, key: Key) -> Result<(), ()>;
-    fn clear(&mut self) -> Result<(), ()>;
+    fn put(&mut self, key: Key, value: Value) -> std::io::Result<()>;
+    fn get(&self, key: &Key) -> Option<&Value>;
+    fn del(&mut self, key: Key) -> std::io::Result<()>;
+    fn clear(&mut self) -> std::io::Result<()>;
 }
 
 #[derive(Debug)]
-pub struct LogStructuredMergeTree<Log = FileLogWriter>
-where
-    Log: LogWriter,
-{
-    wal: Log,
+pub struct LogStructuredMergeTree {
+    wal: FileWal,
     map: HashMap<Key, Value>,
 }
 
-impl<Log: LogWriter> Keyable for LogStructuredMergeTree<Log> {
-    fn put(&mut self, key: Key, value: Value) -> Result<(), ()> {
+impl Keyable for LogStructuredMergeTree {
+    fn put(&mut self, key: Key, value: Value) -> std::io::Result<()> {
         let message = Message::Set {
             key: key.clone(),
             value: value.clone(),
@@ -35,21 +31,18 @@ impl<Log: LogWriter> Keyable for LogStructuredMergeTree<Log> {
         Ok(())
     }
 
-    fn get(&self, key: Key) -> Option<Value> {
-        match self.map.get(&key) {
-            Some(value) => Some(value.clone()),
-            None => None,
-        }
+    fn get(&self, key: &Key) -> Option<&Value> {
+        self.map.get(&key)
     }
 
-    fn del(&mut self, key: Key) -> Result<(), ()> {
+    fn del(&mut self, key: Key) -> std::io::Result<()> {
         let message = Message::Del { key: key.clone() };
         self.wal.append(&message)?;
         self.map.remove(&key);
         Ok(())
     }
 
-    fn clear(&mut self) -> Result<(), ()> {
+    fn clear(&mut self) -> std::io::Result<()> {
         let message = Message::Clear {};
         self.wal.append(&message)?;
         self.map.clear();
@@ -57,31 +50,26 @@ impl<Log: LogWriter> Keyable for LogStructuredMergeTree<Log> {
     }
 }
 
-impl LogStructuredMergeTree<FileLogWriter> {
+impl LogStructuredMergeTree {
     pub fn new<P: AsRef<Path>>(base_path: P) -> Self {
         std::fs::create_dir_all(&base_path).expect("Failed to create WAL directory");
         let mut map = HashMap::new();
-        let reader = FileLogReader::new(&base_path).unwrap();
-        let messages = reader.read();
-        match messages {
-            Ok(messages) => {
-                for message in messages {
-                    match message {
-                        Message::Set { key, value } => {
-                            map.insert(key, value);
-                        }
-                        Message::Del { key } => {
-                            map.remove(&key);
-                        }
-                        Message::Clear {} => {
-                            map.clear();
-                        }
-                    };
-                }
+        let mut wal = FileWal::new(&base_path).unwrap();
+        if let Ok(messages) = wal.read_all() {
+            for message in messages {
+                match message {
+                    Message::Set { key, value } => {
+                        map.insert(key, value);
+                    }
+                    Message::Del { key } => {
+                        map.remove(&key);
+                    }
+                    Message::Clear {} => {
+                        map.clear();
+                    }
+                };
             }
-            Err(_) => panic!("Failed to initialize in-memory store"),
         }
-        let wal = FileLogWriter::new(&base_path).unwrap();
         Self { wal, map }
     }
 }
@@ -96,13 +84,13 @@ mod tests {
         let tmp_dir = TempDir::new().expect("Failed to create temp dir");
         let mut lsm = LogStructuredMergeTree::new(tmp_dir.path());
 
-        std::assert_eq!(
-            lsm.put(Key::from("my_key"), Value::from("some_value")),
-            Ok(())
+        std::assert!(
+            lsm.put(Key::from("my_key"), Value::from("some_value"))
+                .is_ok()
         );
         std::assert_eq!(
-            lsm.get(Key::from("my_key")),
-            Some(Value::from("some_value"))
+            lsm.get(&Key::from("my_key")),
+            Some(Value::from("some_value")).as_ref()
         );
     }
 
@@ -111,7 +99,7 @@ mod tests {
         let tmp_dir = TempDir::new().expect("Failed to create temp dir");
         let lsm = LogStructuredMergeTree::new(tmp_dir.path());
 
-        std::assert_eq!(lsm.get(Key::from("some_key")), None);
+        std::assert_eq!(lsm.get(&Key::from("some_key")), None);
     }
 
     #[test]
@@ -119,22 +107,22 @@ mod tests {
         let tmp_dir = TempDir::new().expect("Failed to create temp dir");
         let mut lsm = LogStructuredMergeTree::new(tmp_dir.path());
 
-        std::assert_eq!(
-            lsm.put(Key::from("my_key"), Value::from("some_value")),
-            Ok(())
+        std::assert!(
+            lsm.put(Key::from("my_key"), Value::from("some_value"))
+                .is_ok(),
         );
         std::assert_eq!(
-            lsm.get(Key::from("my_key")),
-            Some(Value::from("some_value"))
+            lsm.get(&Key::from("my_key")),
+            Some(Value::from("some_value")).as_ref()
         );
 
-        std::assert_eq!(
-            lsm.put(Key::from("my_key"), Value::from("some_new_value")),
-            Ok(())
+        std::assert!(
+            lsm.put(Key::from("my_key"), Value::from("some_new_value"))
+                .is_ok()
         );
         std::assert_eq!(
-            lsm.get(Key::from("my_key")),
-            Some(Value::from("some_new_value"))
+            lsm.get(&Key::from("my_key")),
+            Some(Value::from("some_new_value")).as_ref()
         );
     }
 
@@ -143,17 +131,17 @@ mod tests {
         let tmp_dir = TempDir::new().expect("Failed to create temp dir");
         let mut lsm = LogStructuredMergeTree::new(tmp_dir.path());
 
-        std::assert_eq!(
-            lsm.put(Key::from("my_key"), Value::from("some_value")),
-            Ok(())
+        std::assert!(
+            lsm.put(Key::from("my_key"), Value::from("some_value"))
+                .is_ok(),
         );
         std::assert_eq!(
-            lsm.get(Key::from("my_key")),
-            Some(Value::from("some_value"))
+            lsm.get(&Key::from("my_key")),
+            Some(Value::from("some_value")).as_ref()
         );
 
-        std::assert_eq!(lsm.del(Key::from("my_key")), Ok(()));
-        std::assert_eq!(lsm.get(Key::from("my_key")), None);
+        std::assert!(lsm.del(Key::from("my_key")).is_ok());
+        std::assert_eq!(lsm.get(&Key::from("my_key")), None);
     }
 
     #[test]
@@ -161,26 +149,26 @@ mod tests {
         let tmp_dir = TempDir::new().expect("Failed to create temp dir");
         let mut lsm = LogStructuredMergeTree::new(tmp_dir.path());
 
-        std::assert_eq!(
-            lsm.put(Key::from("my_key_1"), Value::from("some_value_1")),
-            Ok(())
+        std::assert!(
+            lsm.put(Key::from("my_key_1"), Value::from("some_value_1"))
+                .is_ok()
         );
         std::assert_eq!(
-            lsm.get(Key::from("my_key_1")),
-            Some(Value::from("some_value_1"))
-        );
-
-        std::assert_eq!(
-            lsm.put(Key::from("my_key_2"), Value::from("some_value_2")),
-            Ok(())
-        );
-        std::assert_eq!(
-            lsm.get(Key::from("my_key_2")),
-            Some(Value::from("some_value_2"))
+            lsm.get(&Key::from("my_key_1")),
+            Some(Value::from("some_value_1")).as_ref()
         );
 
-        std::assert_eq!(lsm.clear(), Ok(()));
-        std::assert_eq!(lsm.get(Key::from("my_key_1")), None);
-        std::assert_eq!(lsm.get(Key::from("my_key_2")), None);
+        std::assert!(
+            lsm.put(Key::from("my_key_2"), Value::from("some_value_2"))
+                .is_ok()
+        );
+        std::assert_eq!(
+            lsm.get(&Key::from("my_key_2")),
+            Some(Value::from("some_value_2")).as_ref()
+        );
+
+        std::assert!(lsm.clear().is_ok());
+        std::assert_eq!(lsm.get(&Key::from("my_key_1")), None);
+        std::assert_eq!(lsm.get(&Key::from("my_key_2")), None);
     }
 }
