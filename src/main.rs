@@ -28,5 +28,9 @@ fn main() -> ExitCode {
             Ok(_) => ExitCode::SUCCESS,
             Err(_) => ExitCode::FAILURE,
         },
+        Commands::Clear {} => match lsm.clear() {
+            Ok(_) => ExitCode::SUCCESS,
+            Err(_) => ExitCode::FAILURE,
+        },
     }
 }

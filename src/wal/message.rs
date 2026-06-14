@@ -36,6 +36,7 @@ impl Value {
 pub enum Message {
     Set { key: Key, value: Value },
     Del { key: Key },
+    Clear {},
 }
 
 impl Message {

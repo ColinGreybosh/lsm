@@ -18,4 +18,6 @@ pub enum Commands {
     Get { key: String },
     /// Delete a particular key
     Del { key: String },
+    /// Delete all keys
+    Clear {},
 }

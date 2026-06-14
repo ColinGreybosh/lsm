@@ -12,6 +12,7 @@ pub trait Keyable {
     fn put(&mut self, key: Key, value: Value) -> Result<(), ()>;
     fn get(&self, key: Key) -> Option<Value>;
     fn del(&mut self, key: Key) -> Result<(), ()>;
+    fn clear(&mut self) -> Result<(), ()>;
 }
 
 #[derive(Debug)]
@@ -47,6 +48,13 @@ impl<Log: LogWriter> Keyable for LogStructuredMergeTree<Log> {
         self.map.remove(&key);
         Ok(())
     }
+
+    fn clear(&mut self) -> Result<(), ()> {
+        let message = Message::Clear {};
+        self.wal.append(&message)?;
+        self.map.clear();
+        Ok(())
+    }
 }
 
 impl LogStructuredMergeTree<FileLogWriter> {
@@ -59,21 +67,21 @@ impl LogStructuredMergeTree<FileLogWriter> {
             Ok(messages) => {
                 for message in messages {
                     match message {
-                        Message::Set { key, value } => map.insert(key, value),
-                        Message::Del { key } => map.remove(&key),
+                        Message::Set { key, value } => {
+                            map.insert(key, value);
+                        }
+                        Message::Del { key } => {
+                            map.remove(&key);
+                        }
+                        Message::Clear {} => {
+                            map.clear();
+                        }
                     };
                 }
             }
             Err(_) => panic!("Failed to initialize in-memory store"),
         }
         let wal = FileLogWriter::new(&base_path).unwrap();
-        Self { wal, map }
-    }
-}
-
-impl<Log: LogWriter> LogStructuredMergeTree<Log> {
-    pub fn with_wal(wal: Log) -> Self {
-        let map = HashMap::new();
         Self { wal, map }
     }
 }
@@ -92,7 +100,6 @@ mod tests {
             lsm.put(Key::from("my_key"), Value::from("some_value")),
             Ok(())
         );
-
         std::assert_eq!(
             lsm.get(Key::from("my_key")),
             Some(Value::from("some_value"))
@@ -147,5 +154,33 @@ mod tests {
 
         std::assert_eq!(lsm.del(Key::from("my_key")), Ok(()));
         std::assert_eq!(lsm.get(Key::from("my_key")), None);
+    }
+
+    #[test]
+    fn should_clear_keys() {
+        let tmp_dir = TempDir::new().expect("Failed to create temp dir");
+        let mut lsm = LogStructuredMergeTree::new(tmp_dir.path());
+
+        std::assert_eq!(
+            lsm.put(Key::from("my_key_1"), Value::from("some_value_1")),
+            Ok(())
+        );
+        std::assert_eq!(
+            lsm.get(Key::from("my_key_1")),
+            Some(Value::from("some_value_1"))
+        );
+
+        std::assert_eq!(
+            lsm.put(Key::from("my_key_2"), Value::from("some_value_2")),
+            Ok(())
+        );
+        std::assert_eq!(
+            lsm.get(Key::from("my_key_2")),
+            Some(Value::from("some_value_2"))
+        );
+
+        std::assert_eq!(lsm.clear(), Ok(()));
+        std::assert_eq!(lsm.get(Key::from("my_key_1")), None);
+        std::assert_eq!(lsm.get(Key::from("my_key_2")), None);
     }
 }
