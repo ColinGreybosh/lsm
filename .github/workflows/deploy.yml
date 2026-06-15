@@ -75,7 +75,7 @@ jobs:
           tags: tag:github
 
       - name: Trigger VPS Update via SSH
-        uses: appleboy/ssh-action@7e3474434a79f8e2628aba548b4143e496ad0867
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
