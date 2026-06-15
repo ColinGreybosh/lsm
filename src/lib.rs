@@ -67,7 +67,7 @@ impl LogStructuredMergeTree {
                     Message::Clear {} => {
                         map.clear();
                     }
-                };
+                }
             }
         }
         Self { wal, map }

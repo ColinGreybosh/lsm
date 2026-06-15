@@ -12,6 +12,7 @@ impl Display for Key {
 }
 
 impl Key {
+    #[must_use]
     pub fn from(key: &str) -> Self {
         Key(key.to_string())
     }
@@ -27,6 +28,7 @@ impl Display for Value {
 }
 
 impl Value {
+    #[must_use]
     pub fn from(value: &str) -> Self {
         Value(value.to_string())
     }
@@ -40,10 +42,12 @@ pub enum Message {
 }
 
 impl Message {
+    #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         serde_json::to_string(&self).unwrap().into_bytes()
     }
 
+    #[must_use]
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
         serde_json::from_slice::<Message>(&bytes).unwrap()
     }
