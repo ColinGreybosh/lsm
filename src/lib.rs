@@ -32,7 +32,7 @@ impl Keyable for LogStructuredMergeTree {
     }
 
     fn get(&self, key: &Key) -> Option<&Value> {
-        self.map.get(&key)
+        self.map.get(key)
     }
 
     fn del(&mut self, key: Key) -> std::io::Result<()> {
