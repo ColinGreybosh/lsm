@@ -5,15 +5,15 @@ edition = "2024"
 
 [lib]
 name = "kv_store_lib"
-path = "src/lib.rs"
+path = "src/lib/lib.rs"
 
 [[bin]]
 name = "kv_store_server"
-path = "src/server.rs"
+path = "src/server/main.rs"
 
 [[bin]]
 name = "kv_store_cli"
-path = "src/cli.rs"
+path = "src/cli/main.rs"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

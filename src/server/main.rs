@@ -1,8 +1,13 @@
-use kv_store_lib::{
-    config::Config,
-    handlers::{MyKeyValueStore, key_value_store::key_value_store_server::KeyValueStoreServer},
+use crate::{
+    handlers::MyKeyValueStore,
+    protobuf::key_value_store::key_value_store_server::KeyValueStoreServer,
     signals::shutdown_signal,
 };
+use kv_store_lib::config::Config;
+
+mod handlers;
+mod protobuf;
+mod signals;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

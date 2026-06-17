@@ -1,17 +1,13 @@
-use crate::wal::message::{Key, Value};
-use crate::{Keyable, LogStructuredMergeTree};
-use key_value_store::key_value_store_server::KeyValueStore;
-use key_value_store::{
+use crate::protobuf::key_value_store::key_value_store_server::KeyValueStore;
+use crate::protobuf::key_value_store::{
     ClearRequest, ClearResponse, DeleteRequest, DeleteResponse, GetRequest, GetResponse,
     SetRequest, SetResponse,
 };
+use kv_store_lib::wal::message::{Key, Value};
+use kv_store_lib::{Keyable, LogStructuredMergeTree};
 use std::path::Path;
 use tokio::sync::RwLock;
 use tonic::{Request, Response, Status};
-
-pub mod key_value_store {
-    tonic::include_proto!("kv");
-}
 
 #[derive(Debug)]
 pub struct MyKeyValueStore {

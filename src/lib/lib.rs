@@ -5,8 +5,6 @@ use crate::wal::log::{FileWal, WriteAheadLog};
 use crate::wal::message::{Key, Message, Value};
 
 pub mod config;
-pub mod handlers;
-pub mod signals;
 pub mod wal;
 
 pub trait Keyable {
