@@ -1,16 +1,34 @@
-use std::process::ExitCode;
-
-use clap::Parser;
-use lsm::{
+use clap::{Parser, Subcommand};
+use kv_store_lib::{
     Keyable, LogStructuredMergeTree,
-    cli::{Cli, Commands},
+    config::Config,
     wal::message::{Key, Value},
 };
+use std::process::ExitCode;
+
+#[derive(Parser, Debug)]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Insert (or update) the value for a particular key
+    Set { key: String, value: String },
+    /// Get the value for a particular key
+    Get { key: String },
+    /// Delete a particular key
+    Del { key: String },
+    /// Delete all keys
+    Clear {},
+}
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    let config = Config::parse();
 
-    let mut lsm = LogStructuredMergeTree::new(&cli.path);
+    let mut lsm = LogStructuredMergeTree::new(&config.base_path);
 
     match cli.command {
         Commands::Set { key, value } => match lsm.put(Key::from(&key), Value::from(&value)) {
