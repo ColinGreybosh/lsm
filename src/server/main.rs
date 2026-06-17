@@ -1,10 +1,10 @@
 use crate::{
-    handlers::MyKeyValueStore,
+    config::Config, handlers::MyKeyValueStore,
     protobuf::key_value_store::key_value_store_server::KeyValueStoreServer,
     signals::shutdown_signal,
 };
-use kv_store_lib::config::Config;
 
+mod config;
 mod handlers;
 mod protobuf;
 mod signals;
@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::parse();
     let kv_store = MyKeyValueStore::new(config.base_path);
 
-    let addr = "[::1]:50051".parse()?;
+    let addr = format!("{}:{}", config.host, config.port).parse()?;
     tonic::transport::Server::builder()
         .add_service(KeyValueStoreServer::new(kv_store))
         .serve_with_shutdown(addr, shutdown_signal())

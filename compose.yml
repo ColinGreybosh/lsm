@@ -1,0 +1,15 @@
+services:
+  kv:
+    build: .
+    container_name: kv_store
+    ports:
+      - 50051:50051
+    environment:
+      - KV_DATA_DIR=/var/lib/kvstore
+      - HOST=0.0.0.0
+    volumes:
+      - kv_storage:/var/lib/kvstore
+    restart: unless-stopped
+
+volumes:
+  kv_storage:
