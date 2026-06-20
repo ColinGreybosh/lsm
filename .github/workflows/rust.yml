@@ -49,6 +49,7 @@ jobs:
       contents: read
       pages: write
       id-token: write
+    needs: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -67,9 +68,12 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: coverage/
+          name: github-pages-${{ github.run_attempt }}
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
       - name: Write Link to Job Summary
         if: success()
         run: |
