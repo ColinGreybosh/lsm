@@ -60,6 +60,10 @@ jobs:
         - name: Generate report
           run: cargo llvm-cov report --html --output-dir coverage
         - uses: actions/upload-artifact@v4
+          id: upload-coverage-report
           with:
             name: "Coverage report"
             path: coverage/
+        - name: Add coverage report link to summary
+          run: |
+            echo "## [Coverage Report](${{ github.serverUrl }}/${{ github.repository }}/actions/runs/${{ github.runId }}/artifacts/${{ steps.upload-coverage-report.outputs.artifact-id }}/Coverage%20report/index.html)" >> $GITHUB_STEP_SUMMARY
