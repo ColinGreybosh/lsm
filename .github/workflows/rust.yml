@@ -41,6 +41,6 @@ jobs:
         uses: arduino/setup-protoc@v2
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run format
+      - name: Run lint
         run: cargo clippy -- -D warnings
   
