@@ -44,26 +44,36 @@ jobs:
       - name: Run lint
         run: cargo clippy -- -D warnings  
   coverage:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-        - uses: actions-rust-lang/setup-rust-toolchain@v1
-          with:
-            components: llvm-tools-preview
-        - name: Install Protoc
-          uses: arduino/setup-protoc@v2
-          with:
-            repo-token: ${{ secrets.GITHUB_TOKEN }}
-        - uses: taiki-e/install-action@cargo-llvm-cov
-        - name: Generate code coverage
-          run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
-        - name: Generate report
-          run: cargo llvm-cov report --html --output-dir coverage
-        - uses: actions/upload-artifact@v4
-          id: upload-coverage-report
-          with:
-            name: "Coverage report"
-            path: coverage/
-        - name: Add coverage report link to summary
-          run: |
-            echo "## [Coverage Report](${{ github.serverUrl }}/${{ github.repository }}/actions/runs/${{ github.runId }}/artifacts/${{ steps.upload-coverage-report.outputs.artifact-id }}/Coverage%20report/index.html)" >> $GITHUB_STEP_SUMMARY
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: llvm-tools-preview     
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Generate code coverage
+        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+      - name: Generate report
+        run: cargo llvm-cov report --html --output-dir coverage
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: coverage/
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Write Link to Job Summary
+        if: success()
+        run: |
+          echo "### 📊 Interactive Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "The latest code coverage report has been successfully generated and hosted." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 **[Click here to view the live report](${{ steps.deployment.outputs.page_url }})**" >> $GITHUB_STEP_SUMMARY
