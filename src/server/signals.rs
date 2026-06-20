@@ -1,14 +1,14 @@
 pub async fn shutdown_signal() {
     tokio::select! {
-        _ = interrupt_signal() => println!("Received SIGINT"),
-        _ = terminate_signal() => println!("Received SIGTERM"),
-    }
+        () = interrupt_signal() => println!("Received SIGINT"),
+        () = terminate_signal() => println!("Received SIGTERM"),
+    };
 }
 
 async fn interrupt_signal() {
     tokio::signal::ctrl_c()
         .await
-        .expect("failed to install SIGINT handler")
+        .expect("failed to install SIGINT handler");
 }
 
 async fn terminate_signal() {

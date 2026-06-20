@@ -44,7 +44,7 @@ impl WriteAheadLog for FileWal {
             if chunk.is_empty() {
                 continue;
             }
-            messages.push(Message::from_bytes(chunk));
+            messages.push(Message::from_bytes(&chunk));
         }
         Ok(messages)
     }

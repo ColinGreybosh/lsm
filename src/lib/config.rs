@@ -3,6 +3,7 @@ pub struct Config {
 }
 
 impl Config {
+    #[must_use]
     pub fn parse() -> Self {
         let base_path = match std::env::var("KV_DATA_DIR") {
             Ok(path) => path,
