@@ -48,7 +48,7 @@ impl Message {
     }
 
     #[must_use]
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        serde_json::from_slice::<Message>(&bytes).unwrap()
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        serde_json::from_slice::<Message>(bytes).unwrap()
     }
 }

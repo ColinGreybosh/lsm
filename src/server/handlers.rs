@@ -41,7 +41,7 @@ impl KeyValueStore for MyKeyValueStore {
             Key::from(inner.key.as_str()),
             Value::from(inner.value.as_str()),
         ) {
-            Ok(_) => Ok(Response::new(SetResponse {})),
+            Ok(()) => Ok(Response::new(SetResponse {})),
             Err(err) => Err(Status::from_error(Box::new(err))),
         }
     }
@@ -52,7 +52,7 @@ impl KeyValueStore for MyKeyValueStore {
         let mut lock = self.store.write().await;
         let inner = request.into_inner();
         match lock.del(Key::from(inner.key.as_str())) {
-            Ok(_) => Ok(Response::new(DeleteResponse {})),
+            Ok(()) => Ok(Response::new(DeleteResponse {})),
             Err(err) => Err(Status::from_error(Box::new(err))),
         }
     }
@@ -62,7 +62,7 @@ impl KeyValueStore for MyKeyValueStore {
     ) -> Result<Response<ClearResponse>, Status> {
         let mut lock = self.store.write().await;
         match lock.clear() {
-            Ok(_) => Ok(Response::new(ClearResponse {})),
+            Ok(()) => Ok(Response::new(ClearResponse {})),
             Err(err) => Err(Status::from_error(Box::new(err))),
         }
     }
