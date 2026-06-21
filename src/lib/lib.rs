@@ -36,7 +36,7 @@ impl Keyable for LogStructuredMergeTree {
     }
 
     fn del(&mut self, key: Key) -> std::io::Result<()> {
-        let message = Message::Del { key: key.clone() };
+        let message = Message::Delete { key: key.clone() };
         self.wal.append(&message)?;
         self.map.remove(&key);
         Ok(())
@@ -61,7 +61,7 @@ impl LogStructuredMergeTree {
                     Message::Set { key, value } => {
                         map.insert(key, value);
                     }
-                    Message::Del { key } => {
+                    Message::Delete { key } => {
                         map.remove(&key);
                     }
                     Message::Clear {} => {
@@ -170,5 +170,40 @@ mod tests {
         std::assert!(lsm.clear().is_ok());
         std::assert_eq!(lsm.get(&Key::from("my_key_1")), None);
         std::assert_eq!(lsm.get(&Key::from("my_key_2")), None);
+    }
+
+    #[test]
+    fn should_instantiate_with_existing_data() {
+        let tmp_dir = TempDir::new().expect("Failed to create temp dir");
+        {
+            let mut lsm = LogStructuredMergeTree::new(tmp_dir.path());
+            std::assert!(
+                lsm.put(Key::from("my_key_1"), Value::from("some_value_1"))
+                    .is_ok()
+            );
+            std::assert!(
+                lsm.put(Key::from("my_key_2"), Value::from("some_value_2"))
+                    .is_ok()
+            );
+            std::assert!(lsm.clear().is_ok());
+            std::assert!(
+                lsm.put(Key::from("my_key_3"), Value::from("some_value_3"))
+                    .is_ok()
+            );
+            std::assert!(
+                lsm.put(Key::from("my_key_4"), Value::from("some_value_4"))
+                    .is_ok()
+            );
+            std::assert!(lsm.del(Key::from("my_key_3")).is_ok());
+        }
+
+        let new_lsm = LogStructuredMergeTree::new(tmp_dir.path());
+        std::assert_eq!(new_lsm.get(&Key::from("my_key_1")), None);
+        std::assert_eq!(new_lsm.get(&Key::from("my_key_2")), None);
+        std::assert_eq!(new_lsm.get(&Key::from("my_key_3")), None);
+        std::assert_eq!(
+            Some(Value::from("some_value_4")).as_ref(),
+            new_lsm.get(&Key::from("my_key_4")),
+        );
     }
 }

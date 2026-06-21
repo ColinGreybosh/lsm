@@ -62,3 +62,41 @@ impl WriteAheadLog for FileWal {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::wal::message::{Key, Value};
+
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn should_persist_messages() {
+        let tmp_dir = TempDir::new().expect("Failed to create temp dir");
+        let mut log = FileWal::new(tmp_dir.path()).expect("Failed to create WAL");
+        let message = Message::Set {
+            key: Key::from("my_key"),
+            value: Value::from("my_value"),
+        };
+        log.append(&message).expect("Failed to write message");
+        let mut new_log = FileWal::new(tmp_dir.path()).expect("Failed to recreate WAL");
+        let messages = new_log.read_all().expect("Failed to read messages");
+        let expected_messages = vec![message];
+        std::assert_eq!(messages, expected_messages);
+    }
+
+    #[test]
+    fn should_clear_messages_upon_rotate() {
+        let tmp_dir = TempDir::new().expect("Failed to create temp dir");
+        let mut log = FileWal::new(tmp_dir.path()).expect("Failed to create WAL");
+        let message = Message::Set {
+            key: Key::from("my_key"),
+            value: Value::from("my_value"),
+        };
+        log.append(&message).expect("Failed to write message");
+        log.rotate().expect("Failed to rotate log");
+        let messages = log.read_all().expect("Failed to read messages");
+        let expected_messages: Vec<Message> = vec![];
+        std::assert_eq!(messages, expected_messages);
+    }
+}
